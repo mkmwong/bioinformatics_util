@@ -1,4 +1,6 @@
 # bioinformatics_util
+### draft.R
+This .R contains all the commonly used function for data processing and analysis in R.
 ### align.py
 This python3 script is for aligning single/paired-ended fastq files using bowtie2, bwa, STAR and hisat2. Change the header accordingly for the path of fastqs, aliger, and slurm job details. 
 ### tradseq_to_repenrich2.sh
