@@ -140,13 +140,28 @@ save_files <- function(df, csv, outpath) {
 ####             outpath; A string of the name of the output directory,    ####
 ####                      including the prefix of the new file.            ####
 #### return: A dataframe containing PC loading vectors.                    ####
-pca_plot <- function(df, outpath ) {
+pca_plot <- function(df,  outpath, col ) {
   all_pca <- prcomp(df, center = TRUE, scale. = TRUE)
-  all_out <- as.data.frame(all.pca$rotation)
+  all_out <- as.data.frame(all_pca$rotation)
   all_out$feature <- row.names(all_out)
-  save_files(all_out,csv, outpath)
-  return(all_out)
+  var <- all_pca$sdev^2
+  var_ex <- var/sum(var)
+  x_int <- max(all_out$PC1) - min(all_out$PC1)
+  y_int <- max(all_out$PC2) - min(all_out$PC2)
+  x_max <- max(all_out$PC1) + x_int * 0.2
+  x_min <- min(all_out$PC1) - x_int * 0.2
+  y_max <- max(all_out$PC2) + y_int * 0.2
+  y_min <-  min(all_out$PC2) - x_int * 0.2
+  ggplot(all_out,aes(x=PC1,y=PC2,label=feature )) + geom_point(color = col)  +
+    xlab(paste("PC1 (var. explained =", round(var_ex[1],2), ")")) + 
+    ylab(paste("PC2 (var. explained =", round(var_ex[2],2), ")")) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black")) + 
+    geom_hline(yintercept=0, color = "grey") + geom_vline(xintercept=0, color = "grey") + theme_bw() + 
+    theme(axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+          axis.title.y = element_text(color = "black", size = 14, face = "bold")) + geom_text_repel(size=3) +
+    xlim(x_min,x_max) + ylim(y_min, y_max)
+  ggsave(paste0(outpath,".pdf"), width=5, height=5, dpi=600, units="in", device="pdf")
+  save_files(all_pca,FALSE, outpath)
+  return(all_pca)
 }
-#b <- na.omit(a)
-#b <- data.matrix(b[,4:40])
-#c <- prcomp(b, center=TRUE, scale.=TRUE)
