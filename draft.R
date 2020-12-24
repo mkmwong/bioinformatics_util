@@ -132,15 +132,23 @@ save_files <- function(df, csv, outpath) {
   saveRDS(df, paste0(outpath,".rds"))
 }
 
-### pca_plot
+#### pca_plot                                                              ####
 #### This is a function to perform PCA on a named matrix, and returning    ####
 #### principal component loading vectors for graphing.                     ####
 #### parameters: df: A dataframe object to preform principal component     ####
 ####                 analysis on.                                          ####
 ####             outpath; A string of the name of the output directory,    ####
 ####                      including the prefix of the new file.            ####
-#### return: A dataframe containing PC loading vectors.                    ####
-pca_plot <- function(df,  outpath, col ) {
+####             col: Color for each variable in plot                      ####
+####             marg(optional): Multiplier to set the xmin, xmax, ymin,   ####
+####                             ymax for plotting                         ####
+####             w,h,d,un,de(all optional): width, height, dpi, unit and   ####
+####                                        device for saving the plot.    ####
+####                                                                       ####
+#### return: A prcomp object from PCA.                                     ####
+pca_plot <- function(df,  outpath, col, marg=0.2, w = 5, h = 5, d = 600, un = "in", de = "pdf" ) {
+  pkg <- c("ggrepel","ggplot2")
+  install_pkg(pkg, "common")
   all_pca <- prcomp(df, center = TRUE, scale. = TRUE)
   all_out <- as.data.frame(all_pca$rotation)
   all_out$feature <- row.names(all_out)
@@ -148,10 +156,10 @@ pca_plot <- function(df,  outpath, col ) {
   var_ex <- var/sum(var)
   x_int <- max(all_out$PC1) - min(all_out$PC1)
   y_int <- max(all_out$PC2) - min(all_out$PC2)
-  x_max <- max(all_out$PC1) + x_int * 0.2
-  x_min <- min(all_out$PC1) - x_int * 0.2
-  y_max <- max(all_out$PC2) + y_int * 0.2
-  y_min <-  min(all_out$PC2) - x_int * 0.2
+  x_max <- max(all_out$PC1) + x_int * marg
+  x_min <- min(all_out$PC1) - x_int * marg
+  y_max <- max(all_out$PC2) + y_int * marg
+  y_min <-  min(all_out$PC2) - x_int * marg
   ggplot(all_out,aes(x=PC1,y=PC2,label=feature )) + geom_point(color = col)  +
     xlab(paste("PC1 (var. explained =", round(var_ex[1],2), ")")) + 
     ylab(paste("PC2 (var. explained =", round(var_ex[2],2), ")")) +
@@ -161,7 +169,75 @@ pca_plot <- function(df,  outpath, col ) {
     theme(axis.title.x = element_text(color = "black", size = 14, face = "bold"),
           axis.title.y = element_text(color = "black", size = 14, face = "bold")) + geom_text_repel(size=3) +
     xlim(x_min,x_max) + ylim(y_min, y_max)
-  ggsave(paste0(outpath,".pdf"), width=5, height=5, dpi=600, units="in", device="pdf")
+  ggsave(paste0(outpath,".",de), width=w, height=h, dpi=d, units=un, device=de)
   save_files(all_pca,FALSE, outpath)
   return(all_pca)
+}
+
+#### pval_lab                                                              ####
+#### This is a function to return corresponding p value labels for         ####
+#### plotting purpose.                                                     ####
+#### parameters: pval: p-value to convert to label.                        ####
+#### return: A string, the label.                                          ####
+pval_lab <- function(pval) {
+  lab <- NULL
+  if ( pval < 0.05 & pval > 0.01) {
+    lab <- "p < 0.05"
+  } else if ( pval < 0.01 & pval > 0.001) {
+      lab <- "p < 0.01"
+  }
+  else if (pval < 0.001) {
+    lab <- "p < 0.001"
+  }
+  else {
+    lab <- "p > 0.05"
+  }
+  return(lab)
+}
+
+#### corr_plot                                                             ####
+#### This function makes a scatter plot from the two supplied lists of     ####
+#### data. Correlation coefficient and p-value can be plotted optionally.  ####                                    ####
+#### parameters: col1, col2: Two lists of data for plotting scatter plot.  ####
+####                         The two list must have same length.           ####
+####             xlab, ylab: String; X-axis label and y-axis label for the ####
+####                         plot.                                         ####
+####             outpath; A string of the name of the output directory,    ####
+####                      including the prefix of the new file.            ####
+####             marg(optional): Multiplier to set the xmin, xmax, ymin,   ####
+####                             ymax for plotting                         ####
+####             w,h,d,un,de(all optional): width, height, dpi, unit and   ####
+####                                        device for saving the plot.    ####
+####                                                                       ####
+####             addLab(optional): Boolean, whether or not to add R and    ####
+####                               p-value to the plot. Default is FALSE.  ####                                   ####
+####             x1,y1,x2,y2: x and y coordinates for R and p-value        ####
+####                          respectively.                                ####
+#### return: NULL.                                                         ####
+corr_plot <- function(col1, col2, xlab, ylab, outpath, marg = 0.2, 
+                      w = 3, h = 2.5, un = "in", d = 600, de = "pdf",
+                      addLab=FALSE, x1=NULL, x2 = NULL, y1 = NULL, y2 = NULL) {
+  if (length(col1) != length(col2) ) {
+    stop("Length of two supplied list must be equal!")
+  }
+  pkg <- c("ggplot2")
+  install_pkg(pkg, "common")
+  x_int <- max(col1) - min(col1)
+  y_int <- max(col2) - min(col2)
+  x_max <- max(col1) + x_int * marg
+  x_min <- min(col1) - x_int * marg
+  y_max <- max(col2) + y_int * marg
+  y_min <-  min(col2) - x_int * marg
+  a = ggplot(data = as.data.frame(cbind(col1, col2)), 
+             aes(x = col1, y = col2)) + geom_point(alpha = 0.1) +
+    xlim(x_min, x_max) + ylim(y_min, y_max) + geom_smooth(method = "lm") + theme_bw() +
+    xlab(xlab) + ylab(ylab)
+  if( addLab) {
+    corre = paste("r =", round(cor.test(col1, col2)$estimate,2))
+    corre.pval = pval_lab(cor.test(col1, col2)$p.val)
+    a = a + annotate(geom="text",x = x1, y = y1, label=corre,size=4, fontface="bold") + 
+    annotate(geom="text",x = x2, y = y2, label=corre.pval, size=4)
+  }
+  ggsave(paste0(outpath,".",de) ,width = w, height = h, unit = un, dpi = d, device = de)
+  return(NULL)
 }
