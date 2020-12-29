@@ -1,8 +1,8 @@
 # bioinformatics_util
 ### draft.R
 This .R contains all the commonly used function for data processing and analysis in R.
-### *example.R
-This .R contains examples usage fo draft.R
+### plot_script
+This directory contains contains examples usage fo draft.R, as well as plotting/processing script in R.
 ### align.py
 This python3 script is for aligning single/paired-ended fastq files using bowtie2, bwa, STAR and hisat2. Change the header accordingly for the path of fastqs, aliger, and slurm job details. 
 ### runMELT.py
