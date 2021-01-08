@@ -233,11 +233,69 @@ corr_plot <- function(col1, col2, xlab, ylab, outpath, marg = 0.2,
     xlim(x_min, x_max) + ylim(y_min, y_max) + geom_smooth(method = "lm") + theme_bw() +
     xlab(xlab) + ylab(ylab)
   if( addLab) {
-    corre = paste("r =", round(cor.test(col1, col2)$estimate,2))
+    corre = paste("r =", round(cor.test(col1, col2, method = "spearman", exact = FALSE)$estimate,2))
     corre.pval = pval_lab(cor.test(col1, col2)$p.val)
     a = a + annotate(geom="text",x = x1, y = y1, label=corre,size=4, fontface="bold") + 
     annotate(geom="text",x = x2, y = y2, label=corre.pval, size=4)
   }
   ggsave(paste0(outpath,".",de) ,width = w, height = h, unit = un, dpi = d, device = de)
   return(NULL)
+}
+
+## function to return coordinate of genomic range of given feature of gap file 
+## gap file optained from ucsc table browser
+get_gap_GR <- function(gap, type_gap, width){
+  tmp <- gap %>% filter(type == type_gap)
+  ret <- as.data.frame(matrix(ncol = 3, nrow = nrow(tmp)*2 )) %>% 
+    mutate(V1 = rep(tmp$chrom, 2),
+           V2 = c((tmp$chromStart-width + 1), tmp$chromEnd + 1),
+           V3 = c(tmp$chromStart, (tmp$chromEnd + width)))
+  retGR <- GRanges(seqnames= ret$V1, ranges = IRanges(start = ret$V2, end = ret$V3))
+  return(retGR)
+}
+
+### function to export anno pie plot directly from genomic ranges
+export_annopie <- function(gr,txdb,outpath, writefile, h= 4, w = 8) {
+  peakAnno <- annotatePeak(gr, tssRegion=c(-3000, 3000),
+                           TxDb=txdb, annoDb="org.Hs.eg.db")
+  pdf(file = paste0(outpath,".pdf"), height = h, width = w)
+  print(plotAnnoPie(peakAnno))
+  dev.off()
+  if (writefile == TRUE) {
+    write.csv(as.data.frame(peakAnno),paste0(outpath,".csv"))
+  }
+}
+
+#### function to export enriche pathway from peak anno output
+enrich_path_dotplot <- function(gr, outpath, writefile, type = NULL, h=4, w=12) { 
+  df <- as.data.frame(annotatePeak(gr, tssRegion=c(-3000, 3000),
+                           TxDb=txdb, annoDb="org.Hs.eg.db"))
+  if (!is.null(type)) {
+    df <- df %>%
+      filter(grepl(type, annotation))
+  }
+  pathway <- enrichPathway(df$geneId)
+  print(as.data.frame(pathway))
+  pdf(file = paste0(outpath,".pdf"), height = h, width = w)
+  print(dotplot(pathway))
+  dev.off()
+  if (writefile == TRUE) {
+    write.csv(as.data.frame(pathway@result),paste0(outpath,".csv"))
+  }
+}
+
+### function to run deseq###
+run_deseq <- function(ctd, cd, des, cutoff, ref, outpath) {
+  dds <- DESeqDataSetFromMatrix(countData = ctd,
+                                colData = cd,
+                                design = formula(paste0("~", des)))
+  keep <- rowSums(counts(dds)) >= cutoff
+  dds <- dds[keep,]
+  dds$type <- relevel(dds$type, ref = ref)
+  dds <- DESeq(dds)
+  vsd <- vst(dds, blind=FALSE)
+  plotPCA(vsd, intgroup=c(des))
+  ggsave(outpath)
+  res <- results(dds)
+  return(res)
 }
