@@ -115,3 +115,17 @@ col <- "V12"
 
 plot_7b("V13", "../plot/fig7b_family.pdf", 12)
 plot_7b("V12", "../plot/fig7b_class.pdf", 5)
+
+#### plot 7c #### 
+a <- fread("100kb/E017-H3K9me3.fc.signal.bigwig_binned100kb.csv", select=c(2,3,4,7))
+b <- fread("100kb/ML-WT_H3K9me3_new.fc.signal.bigwig_binned100kb.csv", select=c(2,3,4,7))
+summ <- a %>%
+  full_join(b, by=c("seqnames","start","end")) %>%
+  dplyr::rename(Encode_H3K9me3 = average.x,
+                Morr_H3K9me3 = average.y) %>%
+  drop_na()
+
+corr_plot(summ$Encode_H3K9me3, summ$Morr_H3K9me3, "Encode_H3K9me3", "MorrisonLab_H3K9me3", 
+          "../plot/fig7c", marg = 0, w = 3, h = 2.5, un = "in", d = 600, de = "pdf",
+          addLab=TRUE, x1=1, x2 = 1, y1 = 2.8, y2 = 2.5)
+

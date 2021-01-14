@@ -77,7 +77,8 @@ binning_GR <- function(binsGR, datrle, csv, outpath) {
   install_pkg(bio_pkg,"bioconductor")
   gen <- BSgenome.Hsapiens.UCSC.hg19
   si.gen <- seqinfo(gen)
-  si <- si.gen[names(dat)]
+  si <- si.gen[names(datrle)]
+  seqlevels(binsGR) = names(datrle)
   ba <- binnedAverage(binsGR,numvar=datrle,varname='average', na.rm = TRUE)
   save_files(as.data.frame(ba), csv, outpath)
   return(ba)
@@ -298,4 +299,13 @@ run_deseq <- function(ctd, cd, des, cutoff, ref, outpath) {
   ggsave(outpath)
   res <- results(dds)
   return(res)
+}
+
+#### making same n bins from ranges
+make_range <- function(chr, start, end) {
+  range <- end - start
+  jump <- (end - start)/50
+  st <- round(c(start, seq(start+jump+1, end, jump)))
+  en <- round(seq(start+jump-1, end, jump)+1)
+  data.frame(chr, st, en)
 }
