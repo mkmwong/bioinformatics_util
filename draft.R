@@ -168,7 +168,8 @@ pca_plot <- function(df,  outpath, col, marg=0.2, w = 5, h = 5, d = 600, un = "i
           panel.background = element_blank(), axis.line = element_line(colour = "black")) + 
     geom_hline(yintercept=0, color = "grey") + geom_vline(xintercept=0, color = "grey") + theme_bw() + 
     theme(axis.title.x = element_text(color = "black", size = 14, face = "bold"),
-          axis.title.y = element_text(color = "black", size = 14, face = "bold")) + geom_text_repel(size=3) +
+          axis.title.y = element_text(color = "black", size = 14, face = "bold"),
+          axis.text = element_text(size = 11)) + geom_text_repel(size=4) +
     xlim(x_min,x_max) + ylim(y_min, y_max)
   ggsave(paste0(outpath,".",de), width=w, height=h, dpi=d, units=un, device=de)
   save_files(all_pca,FALSE, outpath)
@@ -217,7 +218,8 @@ pval_lab <- function(pval) {
 #### return: NULL.                                                         ####
 corr_plot <- function(col1, col2, xlab, ylab, outpath, marg = 0.2, 
                       w = 3, h = 2.5, un = "in", d = 600, de = "pdf",
-                      addLab=FALSE, x1=NULL, x2 = NULL, y1 = NULL, y2 = NULL) {
+                      addLab=FALSE, x1=NULL, x2 = NULL, y1 = NULL, y2 = NULL,
+                      xmin = NULL, xmax = NULL, ymin = NULL, ymax = NULL) {
   if (length(col1) != length(col2) ) {
     stop("Length of two supplied list must be equal!")
   }
@@ -229,8 +231,20 @@ corr_plot <- function(col1, col2, xlab, ylab, outpath, marg = 0.2,
   x_min <- min(col1) - x_int * marg
   y_max <- max(col2) + y_int * marg
   y_min <-  min(col2) - x_int * marg
+  if (!is.null(xmin)) {
+    x_min = xmin
+  }
+  if (!is.null(xmax)) {
+    x_max = xmax
+  }
+  if (!is.null(ymin)) {
+    y_min = ymin
+  }
+  if (!is.null(ymax)) {
+    y_max = ymax
+  }
   a = ggplot(data = as.data.frame(cbind(col1, col2)), 
-             aes(x = col1, y = col2)) + geom_point(alpha = 0.1) +
+             aes(x = col1, y = col2)) + geom_point(alpha = 0.1, size = 0.2) +
     xlim(x_min, x_max) + ylim(y_min, y_max) + geom_smooth(method = "lm") + theme_bw() +
     xlab(xlab) + ylab(ylab)
   if( addLab) {
@@ -302,10 +316,119 @@ run_deseq <- function(ctd, cd, des, cutoff, ref, outpath) {
 }
 
 #### making same n bins from ranges
-make_range <- function(chr, start, end) {
+make_range <- function(chr, start, end, bin_num=50) {
   range <- end - start
-  jump <- (end - start)/50
+  jump <- (end - start)/bin_num
   st <- round(c(start, seq(start+jump+1, end, jump)))
   en <- round(seq(start+jump-1, end, jump)+1)
   data.frame(chr, st, en)
+}
+
+##### get gap coordinate 
+get_df <- function(rbko, wt, gap_type, gap_width, group_name){
+  summ <- rbko %>% full_join(wt, by=c("seqnames", "start","end")) %>%
+    dplyr::rename(RbKO = average.x, WT = average.y) %>%
+    mutate(WT = WT/median(na.omit(WT)), 
+           RbKO = RbKO/median(na.omit(RbKO)),
+           FC = RbKO/WT) %>% 
+    filter(seqnames != "chrX") %>%
+    filter(seqnames != "chrY") %>%
+    filter(seqnames != "chrM") %>%
+    mutate_at(vars(RbKO, WT, FC), log2) %>% 
+    drop_na() 
+  
+  gap <- fread("../hg19gap.txt", stringsAsFactors = FALSE)
+  centroGR <- get_gap_GR(gap, gap_type, gap_width)
+  summGR <- GRanges(seqnames = summ$seqnames, ranges = IRanges(start = summ$start, end = summ$end), 
+                    RbKO = summ$RbKO, WT = summ$WT, FC = summ$FC)
+  centro_regionGR <- subsetByOverlaps(summGR,centroGR)
+  centro_region <- as.data.frame(centro_regionGR) %>%
+    mutate(group = group_name)
+  centro_region$seqnames <- as.character(centro_region$seqnames)
+  rand_loc <- sample(1:nrow(summ),nrow(centro_region),replace=F)
+  rand_region <- summ[rand_loc,] %>% 
+    mutate(group = "Random")
+  
+  all_df <- rbind(centro_region[,c(1:3,6:9)], rand_region) %>%
+    mutate(group = as.factor(group)) %>% 
+    gather(Sig_type, Sig, -c(seqnames, start, end, group ))
+  all_df$Sig_type <- factor(all_df$Sig_type, levels = c("RbKO","WT","FC"))
+  return(all_df)
+}
+
+#### return dipyrimidine counts of 
+
+get_dipy_counts <- function(gr, genome) {
+  gap_a <- getSeq(genome, gr)
+  gap_tt <- as.data.frame(dinucleotideFrequency(gap_a, 1))
+  gap_tt$summ <- rowSums(gap_tt)
+  gap_tt$TpT = (gap_tt$TT + gap_tt$AA)/(gap_tt$summ*2)
+  gap_tt$TpC = (gap_tt$TC + gap_tt$AG)/(gap_tt$summ*2)
+  gap_tt$CpT = (gap_tt$CT + gap_tt$GA)/(gap_tt$summ*2)
+  gap_tt$CpC = (gap_tt$CC + gap_tt$GG)/(gap_tt$summ*2)
+  return(gap_tt)
+}
+
+## df colnames for seqnames, start and end has to be V1, V2 an V3 respectively 
+dist_to_LAD <- function(sn, st, en) {
+  # case1
+  LAD <- fread("data/GSE49341_LiftOver_LAD_GRO.bed")
+  setorder(LAD, V1, V2)
+  selected <- LAD %>% 
+    filter(V1== sn) 
+  subselected <- selected %>%
+    filter((V2 <= st & V3 >= en) | (V2 >= st & V2 <= en) | (V3 >= st & V3 <= en)) 
+  if(nrow(subselected) > 0) {
+    return(0)
+  }
+  sub1 <- selected %>% filter(V3 <= st)
+  sub2 <- selected %>% filter(V2 >= en)
+  if(nrow(sub1) == 0) {
+    return(sub2$V2[1] - en )
+  } else if (nrow(sub2) == 0 ) {
+    return(st - sub1$V3[nrow(sub1)])
+  } else {
+    return(min((sub2$V2[1] - en), (st - sub1$V3[nrow(sub1)]) ))
+  }
+}
+
+dist_to_centrotelo <- function(sn, st, en) {
+  cent <- fread("data/hg19gap.txt") %>% 
+    filter(type == "centromere")
+  telo <- fread("data/hg19gap.txt") %>% 
+    filter(type == "telomere")
+  ct_summ <- rbind(cent, telo) %>% 
+    dplyr::select(chrom, chromStart, chromEnd)
+  setorder(ct_summ, chrom, chromStart)
+  selected <- ct_summ %>% 
+    filter(chrom== sn) 
+  subselected <- selected %>%
+    filter((chromStart <= st & chromEnd >= en) | (chromStart >= st & chromStart <= en) | (chromEnd >= st & chromEnd <= en)) 
+  if(nrow(subselected) > 0) {
+    return(0)
+  }
+  sub1 <- selected %>% filter(chromEnd <= st)
+  sub2 <- selected %>% filter(chromStart >= en)
+  if(nrow(sub1) == 0) {
+    return(sub2$chromStart[1] - en )
+  } else if (nrow(sub2) == 0 ) {
+    return(st - sub1$chromEnd[nrow(sub1)])
+  } else {
+    return(min((sub2$chromStart[1] - en), (st - sub1$chromEnd[nrow(sub1)]) ))
+  }
+}
+
+pval_to_label <- function(pval) {
+  if (pval > 0.05) {
+    return("NS")
+  }
+  else if (pval < 0.05 & pval > 0.01) {
+    return("*")
+  }
+  else if (pval < 0.01 & pval > 0.001) {
+    return("**")
+  }
+  else {
+    return("***")
+  }
 }

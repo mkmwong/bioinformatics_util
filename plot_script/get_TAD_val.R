@@ -19,10 +19,10 @@ hic_compressed$open$domain <- "open"
 closed <- as.data.frame(hic_compressed$closed)
 open <- as.data.frame(hic_compressed$open)
 
-process_and_bin <- function(fname, bin, outpath) {
-  a <- mapply(make_range, bin$seqnames, bin$start, bin$end, SIMPLIFY = FALSE)
+process_and_bin <- function(fname, bin, outpath, bin_num) {
+  a <- mapply(make_range, bin$seqnames, bin$start, bin$end, bin_num, SIMPLIFY = FALSE)
   b <- do.call(rbind, a) %>% 
-    mutate(id = rep(1:(length(a)), each = 50))
+    mutate(id = rep(1:(length(a)), each = bin_num))
   b <- GRanges(seqnames = b$chr, ranges = IRanges(start = b$st, end = b$en), id = b$id)
   dat <- import.bw(fname, as = "RleList")
   print(head(b))
@@ -47,6 +47,33 @@ process_and_bin("unbinned/RbKO_H3K9me3.fc.signal.bigwig", open, "RbKOH3K9me3_ope
 process_and_bin("unbinned/WT_H3K9me3.fc.signal.bigwig", closed, "WTH3K9me3_closedTAD")
 process_and_bin("unbinned/WT_H3K9me3.fc.signal.bigwig", open, "WTH3K9me3_openTAD")
 
+#######
+get_coor_GR <- function(tmp, width){
+  ret <- as.data.frame(matrix(ncol = 3, nrow = nrow(tmp)*2 )) %>% 
+    mutate(V1 = rep(tmp$seqnames, 2),
+           V2 = c((tmp$start-width + 1), tmp$end + 1),
+           V3 = c(tmp$start, (tmp$end + width)),
+           V4 = rep(1:nrow(tmp), each = 2),
+           V5 = rep(c("L","R"), nrow(tmp)))
+  retGR <- GRanges(seqnames= ret$V1, ranges = IRanges(start = ret$V2, end = ret$V3),
+                   which_closed = ret$V4, which_side = ret$V5 )
+  return(retGR)
+}
 
+closed_side <- as.data.frame(get_coor_GR(closed,20000))
+left <- closed_side %>% filter(which_side == "L")
+right <- closed_side %>% filter(which_side == "R")
+process_and_bin("unbinned/RbKO_CPD100.fc.signal.bw", left, "RbKOCPD_closedTAD_left" ,25)
+process_and_bin("unbinned/RbKO_CPD100.fc.signal.bw", right, "RbKOCPD_closedTAD_right")
+process_and_bin("unbinned/WT_CPD100.fc.signal.bw", left, "WTCPD_closedTAD_left")
+process_and_bin("unbinned/WT_CPD100.fc.signal.bw", right, "WTCPD_closedTAD_right")
+process_and_bin("unbinned/RbKO_H3K27me3.fc.signal.bigwig", left, "RbKOH3K27me3_closedTAD_left")
+process_and_bin("unbinned/RbKO_H3K27me3.fc.signal.bigwig", right, "RbKOH3K27me3_closedTAD_right")
+process_and_bin("unbinned/WT_H3K27me3.fc.signal.bigwig", left, "WTH3K27me3_closedTAD_left")
+process_and_bin("unbinned/WT_H3K27me3.fc.signal.bigwig", right, "WTH3K27me3_closedTAD_right")
+process_and_bin("unbinned/RbKO_H3K9me3.fc.signal.bigwig", left, "RbKOH3K9me3_closedTAD_left")
+process_and_bin("unbinned/RbKO_H3K9me3.fc.signal.bigwig", right, "RbKOH3K9me3_closedTAD_right")
+process_and_bin("unbinned/WT_H3K9me3.fc.signal.bigwig", left, "WTH3K9me3_closedTAD_left")
+process_and_bin("unbinned/WT_H3K9me3.fc.signal.bigwig", right, "WTH3K9me3_closedTAD_right")
 
 

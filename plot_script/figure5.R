@@ -4,10 +4,10 @@ source("~/Desktop/yr5/summ/bioinformatics_util/draft.R")
 pkg <- c("dplyr","tidyr")
 install_pkg(pkg,"common")
 
-a<-merge_df("~/Desktop/yr5/summ/bioinformatics_util/data/100kb/", c("seqnames","start","end"), 
-                      4, TRUE, "~/Desktop/yr5/summ/bioinformatics_util/data/100kb_summary", c(2,3,4,7))
+#a<-merge_df("~/Desktop/yr5/summ/bioinformatics_util/data/100kb/", c("seqnames","start","end"), 
+#                      4, TRUE, "~/Desktop/yr5/summ/bioinformatics_util/data/100kb_summary", c(2,3,4,7))
 #### Alternative could be reaad in after running merge_df.
-#a <- readRDS(file = "~/Desktop/yr5/summ/bioinformatics_util/data/100kb_summary.rds")
+a <- readRDS(file = "~/Desktop/yr5/summ/bioinformatics_util/data/100kb_summary.rds")
 a <- a %>% 
   dplyr::rename( H2AZ = H2A, 
          Rep_Time = wgEncodeFsuRepliChipImr90WaveSignalRep1,
@@ -34,3 +34,19 @@ col <- c("lightsalmon1","skyblue1","skyblue1","skyblue1","skyblue1","skyblue1",
         "skyblue1","skyblue1","skyblue1", "skyblue1", "skyblue1","lightsalmon1","lightsalmon1","lightsalmon1",
         "lightsalmon1","lightsalmon1","lightsalmon1","lightsalmon1","lightsalmon1","lightsalmon1")
 all_out <- pca_plot (a, "~/Desktop/yr5/summ/bioinformatics_util/PCA", col, 0.2)
+
+
+
+#### figure5 v2 - removing all home chipseq data
+a <- a[,-c(32,33,35,36)]
+a <- data.matrix(a)
+
+col <- c("lightsalmon1","skyblue1","skyblue1","skyblue1","skyblue1","skyblue1",
+         "skyblue1","skyblue1","skyblue1","skyblue1","skyblue1","skyblue1",
+         "skyblue1","skyblue1","skyblue1","skyblue1","skyblue1","skyblue1",
+         "skyblue1","skyblue1","skyblue1","skyblue1","skyblue1","lightsalmon1",
+         "skyblue1","skyblue1","skyblue1", "skyblue1", "skyblue1","lightsalmon1","lightsalmon1",
+         "lightsalmon1","lightsalmon1","lightsalmon1")
+all_out <- pca_plot (a, "~/Desktop/yr5/summ/bioinformatics_util/PCA_subset", col, 0.2)
+
+

@@ -1,2 +1,10 @@
 data/
 plot/
+svg/
+svg_for_thesis/
+*xlsx
+*rds
+*csv
+testchrom3d/
+whole_fig_svg/
+.rds
